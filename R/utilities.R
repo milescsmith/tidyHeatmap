@@ -1,5 +1,3 @@
-
-
 #' This is a generalisation of ifelse that accepts an object and return an objects
 #'
 #' @import dplyr
@@ -12,14 +10,15 @@
 #' @param .f2 A function
 #'
 #' @return A tibble
-ifelse_pipe = function(.x, .p, .f1, .f2 = NULL) {
-  switch(.p %>% not%>% sum(1),
-         as_mapper(.f1)(.x),
-         if (.f2 %>% is.null %>% not)
-           as_mapper(.f2)(.x)
-         else
-           .x)
-  
+ifelse_pipe <- function(.x, .p, .f1, .f2 = NULL) {
+  switch(.p %>% not() %>% sum(1),
+    as_mapper(.f1)(.x),
+    if (.f2 %>% is.null() %>% not()) {
+      as_mapper(.f2)(.x)
+    } else {
+      .x
+    }
+  )
 }
 
 #' This is a generalisation of ifelse that accepts an object and return an objects
@@ -35,26 +34,32 @@ ifelse_pipe = function(.x, .p, .f1, .f2 = NULL) {
 #' @param .f3 A function
 #'
 #' @return A tibble
-ifelse2_pipe = function(.x, .p1, .p2, .f1, .f2, .f3 = NULL) {
+ifelse2_pipe <- function(.x, .p1, .p2, .f1, .f2, .f3 = NULL) {
   # Nested switch
-  switch(# First condition
-    .p1 %>% not%>% sum(1),
-    
+  switch( # First condition
+    .p1 %>%
+      not() %>%
+      sum(1),
+
     # First outcome
     as_mapper(.f1)(.x),
     switch(
       # Second condition
-      .p2 %>% not %>% sum(1),
-      
+      .p2 %>%
+        not() %>%
+        sum(1),
+
       # Second outcome
       as_mapper(.f2)(.x),
-      
+
       # Third outcome - if there is not .f3 just return the original data frame
-      if (.f3 %>% is.null %>% not)
+      if (.f3 %>% is.null() %>% not()) {
         as_mapper(.f3)(.x)
-      else
+      } else {
         .x
-    ))
+      }
+    )
+  )
 }
 
 #' Get matrix from tibble
@@ -74,31 +79,30 @@ ifelse2_pipe = function(.x, .p1, .p2, .f1, .f2, .f3 = NULL) {
 as_matrix <- function(tbl,
                       rownames = NULL,
                       do_check = TRUE) {
-  
   # Comply with CRAN NOTES
-  variable = NULL
-  
-  rownames = enquo(rownames)
+  variable <- NULL
+
+  rownames <- enquo(rownames)
   tbl %>%
-    
     # Through warning if data frame is not numerical beside the rownames column (if present)
     ifelse_pipe(
       do_check &&
         tbl %>%
-        # If rownames defined eliminate it from the data frame
-        ifelse_pipe(!quo_is_null(rownames), ~ .x[, -1], ~ .x) %>%
-        dplyr::summarise_all(class) %>%
-        tidyr::gather(variable, class) %>%
-        pull(class) %>%
-        unique() %>%
-        `%in%`(c("numeric", "integer")) %>% not() %>% any(),
+          # If rownames defined eliminate it from the data frame
+          ifelse_pipe(!quo_is_null(rownames), ~ .x[, -1], ~.x) %>%
+          dplyr::summarise_all(class) %>%
+          tidyr::gather(variable, class) %>%
+          pull(class) %>%
+          unique() %>%
+          `%in%`(c("numeric", "integer")) %>%
+          not() %>%
+          any(),
       ~ {
         warning("to_matrix says: there are NON-numerical columns, the matrix will NOT be numerical")
         .x
       }
     ) %>%
     as.data.frame() %>%
-    
     # Deal with rownames column if present
     ifelse_pipe(
       !quo_is_null(rownames),
@@ -106,7 +110,6 @@ as_matrix <- function(tbl,
         magrittr::set_rownames(tbl %>% pull(!!rownames)) %>%
         select(-1)
     ) %>%
-    
     # Convert to matrix
     as.matrix()
 }
@@ -118,17 +121,18 @@ as_matrix <- function(tbl,
 #'
 #' @return NA
 error_if_log_transformed <- function(x, .abundance) {
-  
   # Comply with CRAN NOTES
-  m = NULL
-  
-  .abundance = enquo(.abundance)
-  
-  if (x %>% nrow %>% gt(0))
-    if (x %>% summarise(m = !!.abundance %>% max) %>% pull(m) < 50)
+  m <- NULL
+
+  .abundance <- enquo(.abundance)
+
+  if (x %>% nrow() %>% gt(0)) {
+    if (x %>% summarise(m = !!.abundance %>% max()) %>% pull(m) < 50) {
       stop(
         "tidyHeatmap says: The input was log transformed, this algorithm requires raw (un-normalised) read counts"
       )
+    }
+  }
 }
 
 #' .formula parser
@@ -140,10 +144,11 @@ error_if_log_transformed <- function(x, .abundance) {
 #'
 #'
 parse_formula <- function(fm) {
-  if (attr(terms(fm), "response") == 1)
+  if (attr(terms(fm), "response") == 1) {
     stop("tidyHeatmap says: The .formula must be of the kind \"~ covariates\" ")
-  else
+  } else {
     as.character(attr(terms(fm), "variables"))[-1]
+  }
 }
 
 #' Scale design matrix
@@ -157,14 +162,13 @@ parse_formula <- function(fm) {
 #' @return A tibble
 #'
 #'
-scale_design = function(df, .formula) {
-  
+scale_design <- function(df, .formula) {
   # Comply with CRAN NOTES
-  value = sample_idx = `(Intercept)` =  NULL
-  
+  value <- sample_idx <- `(Intercept)` <- NULL
+
   df %>%
     setNames(c("sample_idx", "(Intercept)", parse_formula(.formula))) %>%
-    gather(cov, value,-sample_idx) %>%
+    gather(cov, value, -sample_idx) %>%
     group_by(cov) %>%
     mutate(value = ifelse(
       !grepl("Intercept", cov) &
@@ -186,7 +190,7 @@ scale_design = function(df, .formula) {
 #' @param name A character name of the attribute
 #'
 #' @return A tibble with an additional attribute
-add_attr = function(var, attribute, name) {
+add_attr <- function(var, attribute, name) {
   attr(var, name) <- attribute
   var
 }
@@ -198,8 +202,8 @@ add_attr = function(var, attribute, name) {
 #' @param name A character name of the class
 #'
 #' @return A tibble with an additional attribute
-drop_class = function(var, name) {
-  class(var) <- class(var)[!class(var)%in%name]
+drop_class <- function(var, name) {
+  class(var) <- class(var)[!class(var) %in% name]
   var
 }
 
@@ -211,14 +215,12 @@ drop_class = function(var, name) {
 #'
 #' @return An array
 #'
-prepend = function (x, values, before = 1)
-{
+prepend <- function(x, values, before = 1) {
   n <- length(x)
   stopifnot(before > 0 && before <= n)
   if (before == 1) {
     c(values, x)
-  }
-  else {
+  } else {
     c(x[1:(before - 1)], values, x[before:n])
   }
 }
@@ -229,10 +231,9 @@ prepend = function (x, values, before = 1)
 #' @param name A character name of the attribute
 #'
 #' @return A tibble with an additional attribute
-add_class = function(var, name) {
-  
-  class(var) <- prepend(class(var),name)
-  
+add_class <- function(var, name) {
+  class(var) <- prepend(class(var), name)
+
   var
 }
 
@@ -246,34 +247,40 @@ add_class = function(var, name) {
 #' @param .abundance A character name of the read count column
 #'
 #' @return A list of column enquo or error
-get_sample_transcript_counts = function(.data, .sample, .transcript, .abundance){
-  
-  
-  my_stop = function() {
+get_sample_transcript_counts <- function(.data, .sample, .transcript, .abundance) {
+  my_stop <- function() {
     stop("
         tidyHeatmap says: The function does not know what your sample, transcript and counts columns are.\n
         You have to either enter those as symbols (e.g., `sample`), \n
         or use the funtion create_tt_from_tibble() to pass your column names that will be remembered.
       ")
   }
-  
-  if( .sample %>% quo_is_symbol() ) .sample = .sample
-  else if(".sample" %in% (.data %>% attr("parameters") %>% names))
-    .sample =  attr(.data, "parameters")$.sample
-  else my_stop()
-  
-  if( .transcript %>% quo_is_symbol() ) .transcript = .transcript
-  else if(".transcript" %in% (.data %>% attr("parameters") %>% names))
-    .transcript =  attr(.data, "parameters")$.transcript
-  else my_stop()
-  
-  if( .abundance %>% quo_is_symbol() ) .abundance = .abundance
-  else if(".abundance" %in% (.data %>% attr("parameters") %>% names))
-    .abundance = attr(.data, "parameters")$.abundance
-  else my_stop()
-  
+
+  if (.sample %>% quo_is_symbol()) {
+    .sample <- .sample
+  } else if (".sample" %in% (.data %>% attr("parameters") %>% names())) {
+    .sample <- attr(.data, "parameters")$.sample
+  } else {
+    my_stop()
+  }
+
+  if (.transcript %>% quo_is_symbol()) {
+    .transcript <- .transcript
+  } else if (".transcript" %in% (.data %>% attr("parameters") %>% names())) {
+    .transcript <- attr(.data, "parameters")$.transcript
+  } else {
+    my_stop()
+  }
+
+  if (.abundance %>% quo_is_symbol()) {
+    .abundance <- .abundance
+  } else if (".abundance" %in% (.data %>% attr("parameters") %>% names())) {
+    .abundance <- attr(.data, "parameters")$.abundance
+  } else {
+    my_stop()
+  }
+
   list(.sample = .sample, .transcript = .transcript, .abundance = .abundance)
-  
 }
 
 #' Get column names either from user or from attributes
@@ -285,29 +292,32 @@ get_sample_transcript_counts = function(.data, .sample, .transcript, .abundance)
 #' @param .abundance A character name of the read count column
 #'
 #' @return A list of column enquo or error
-get_sample_counts = function(.data, .sample, .abundance){
-  
-  
-  my_stop = function() {
+get_sample_counts <- function(.data, .sample, .abundance) {
+  my_stop <- function() {
     stop("
         tidyHeatmap says: The function does not know what your sample, transcript and counts columns are.\n
         You have to either enter those as symbols (e.g., `sample`), \n
         or use the funtion create_tt_from_tibble() to pass your column names that will be remembered.
       ")
   }
-  
-  if( .sample %>% quo_is_symbol() ) .sample = .sample
-  else if(".sample" %in% (.data %>% attr("parameters") %>% names))
-    .sample =  attr(.data, "parameters")$.sample
-  else my_stop()
-  
-  if( .abundance %>% quo_is_symbol() ) .abundance = .abundance
-  else if(".abundance" %in% (.data %>% attr("parameters") %>% names))
-    .abundance = attr(.data, "parameters")$.abundance
-  else my_stop()
-  
+
+  if (.sample %>% quo_is_symbol()) {
+    .sample <- .sample
+  } else if (".sample" %in% (.data %>% attr("parameters") %>% names())) {
+    .sample <- attr(.data, "parameters")$.sample
+  } else {
+    my_stop()
+  }
+
+  if (.abundance %>% quo_is_symbol()) {
+    .abundance <- .abundance
+  } else if (".abundance" %in% (.data %>% attr("parameters") %>% names())) {
+    .abundance <- attr(.data, "parameters")$.abundance
+  } else {
+    my_stop()
+  }
+
   list(.sample = .sample, .abundance = .abundance)
-  
 }
 
 #' Get column names either from user or from attributes
@@ -319,30 +329,33 @@ get_sample_counts = function(.data, .sample, .abundance){
 #' @param .transcript A character name of the transcript/gene column
 #'
 #' @return A list of column enquo or error
-get_sample_transcript = function(.data, .sample, .transcript){
-  
-  
-  my_stop = function() {
+get_sample_transcript <- function(.data, .sample, .transcript) {
+  my_stop <- function() {
     stop("
         tidyHeatmap says: The function does not know what your sample, transcript and counts columns are.\n
         You have to either enter those as symbols (e.g., `sample`), \n
         or use the funtion create_tt_from_tibble() to pass your column names that will be remembered.
       ")
   }
-  
-  if( .sample %>% quo_is_symbol() ) .sample = .sample
-  else if(".sample" %in% (.data %>% attr("parameters") %>% names))
-    .sample =  attr(.data, "parameters")$.sample
-  else my_stop()
-  
-  if( .transcript %>% quo_is_symbol() ) .transcript = .transcript
-  else if(".transcript" %in% (.data %>% attr("parameters") %>% names))
-    .transcript =  attr(.data, "parameters")$.transcript
-  else my_stop()
-  
-  
+
+  if (.sample %>% quo_is_symbol()) {
+    .sample <- .sample
+  } else if (".sample" %in% (.data %>% attr("parameters") %>% names())) {
+    .sample <- attr(.data, "parameters")$.sample
+  } else {
+    my_stop()
+  }
+
+  if (.transcript %>% quo_is_symbol()) {
+    .transcript <- .transcript
+  } else if (".transcript" %in% (.data %>% attr("parameters") %>% names())) {
+    .transcript <- attr(.data, "parameters")$.transcript
+  } else {
+    my_stop()
+  }
+
+
   list(.sample = .sample, .transcript = .transcript)
-  
 }
 
 
@@ -357,43 +370,38 @@ get_sample_transcript = function(.data, .sample, .transcript){
 #'
 #' @return A list of column enquo or error
 #'
-get_elements_features = function(.data, .element, .feature, of_samples = TRUE){
-  
+get_elements_features <- function(.data, .element, .feature, of_samples = TRUE) {
   # If setted by the user, enquo those
-  if(
+  if (
     .element %>% quo_is_symbol() &
-    .feature %>% quo_is_symbol()
-  )
+      .feature %>% quo_is_symbol()
+  ) {
     return(list(
       .element = .element,
       .feature = .feature
     ))
-  
-  # Otherwise check if attribute exists
+  } # Otherwise check if attribute exists
   else {
-    
     # If so, take them from the attribute
-    if(.data %>% attr("parameters") %>% is.null %>% not)
-      
+    if (.data %>% attr("parameters") %>% is.null() %>% not()) {
       return(list(
-        .element =  switch(
-          of_samples %>% not %>% sum(1),
+        .element = switch(of_samples %>% not() %>% sum(1),
           attr(.data, "parameters")$.sample,
           attr(.data, "parameters")$.transcript
         ),
-        .feature = switch(
-          of_samples %>% not %>% sum(1),
+        .feature = switch(of_samples %>% not() %>% sum(1),
           attr(.data, "parameters")$.transcript,
           attr(.data, "parameters")$.sample
         )
       ))
-    # Else through error
-    else
+    } # Else through error
+    else {
       stop("
         tidyHeatmap says: The function does not know what your elements (e.g., sample) and features (e.g., transcripts) are.\n
         You have to either enter those as symbols (e.g., `sample`), \n
         or use the funtion create_tt_from_tibble() to pass your column names that will be remembered.
       ")
+    }
   }
 }
 
@@ -410,35 +418,43 @@ get_elements_features = function(.data, .element, .feature, of_samples = TRUE){
 #'
 #' @return A list of column enquo or error
 #'
-get_elements_features_abundance = function(.data, .element, .feature, .abundance, of_samples = TRUE){
-  
-  my_stop = function() {
+get_elements_features_abundance <- function(.data, .element, .feature, .abundance, of_samples = TRUE) {
+  my_stop <- function() {
     stop("
         tidyHeatmap says: The function does not know what your elements (e.g., sample) and features (e.g., transcripts) are.\n
         You have to either enter those as symbols (e.g., `sample`), \n
         or use the funtion create_tt_from_tibble() to pass your column names that will be remembered.
       ")
   }
-  
-  if( .element %>% quo_is_symbol() ) .element = .element
-  else if(of_samples & ".sample" %in% (.data %>% attr("parameters") %>% names))
-    .element =  attr(.data, "parameters")$.sample
-  else if((!of_samples) & ".transcript" %in% (.data %>% attr("parameters") %>% names))
-    .element =  attr(.data, "parameters")$.transcript
-  else my_stop()
-  
-  if( .feature %>% quo_is_symbol() ) .feature = .feature
-  else if(of_samples & ".transcript" %in% (.data %>% attr("parameters") %>% names))
-    .feature =  attr(.data, "parameters")$.transcript
-  else if((!of_samples) & ".sample" %in% (.data %>% attr("parameters") %>% names))
-    .feature =  attr(.data, "parameters")$.sample
-  else my_stop()
-  
-  if( .abundance %>% quo_is_symbol() ) .abundance = .abundance
-  else if(".abundance" %in% (.data %>% attr("parameters") %>% names))
-    .abundance = attr(.data, "parameters")$.abundance
-  else my_stop()
-  
+
+  if (.element %>% quo_is_symbol()) {
+    .element <- .element
+  } else if (of_samples & ".sample" %in% (.data %>% attr("parameters") %>% names())) {
+    .element <- attr(.data, "parameters")$.sample
+  } else if ((!of_samples) & ".transcript" %in% (.data %>% attr("parameters") %>% names())) {
+    .element <- attr(.data, "parameters")$.transcript
+  } else {
+    my_stop()
+  }
+
+  if (.feature %>% quo_is_symbol()) {
+    .feature <- .feature
+  } else if (of_samples & ".transcript" %in% (.data %>% attr("parameters") %>% names())) {
+    .feature <- attr(.data, "parameters")$.transcript
+  } else if ((!of_samples) & ".sample" %in% (.data %>% attr("parameters") %>% names())) {
+    .feature <- attr(.data, "parameters")$.sample
+  } else {
+    my_stop()
+  }
+
+  if (.abundance %>% quo_is_symbol()) {
+    .abundance <- .abundance
+  } else if (".abundance" %in% (.data %>% attr("parameters") %>% names())) {
+    .abundance <- attr(.data, "parameters")$.abundance
+  } else {
+    my_stop()
+  }
+
   list(.element = .element, .feature = .feature, .abundance = .abundance)
 }
 
@@ -451,36 +467,32 @@ get_elements_features_abundance = function(.data, .element, .feature, .abundance
 #' @param of_samples A boolean
 #'
 #' @return A list of column enquo or error
-get_elements = function(.data, .element, of_samples = TRUE){
-  
+get_elements <- function(.data, .element, of_samples = TRUE) {
   # If setted by the user, enquo those
-  if(
+  if (
     .element %>% quo_is_symbol()
-  )
+  ) {
     return(list(
       .element = .element
     ))
-  
-  # Otherwise check if attribute exists
+  } # Otherwise check if attribute exists
   else {
-    
     # If so, take them from the attribute
-    if(.data %>% attr("parameters") %>% is.null %>% not)
-      
+    if (.data %>% attr("parameters") %>% is.null() %>% not()) {
       return(list(
-        .element =  switch(
-          of_samples %>% not %>% sum(1),
+        .element = switch(of_samples %>% not() %>% sum(1),
           attr(.data, "parameters")$.sample,
           attr(.data, "parameters")$.transcript
         )
       ))
-    # Else through error
-    else
+    } # Else through error
+    else {
       stop("
         tidyHeatmap says: The function does not know what your elements (e.g., sample) are.\n
         You have to either enter those as symbols (e.g., `sample`), \n
         or use the funtion create_tt_from_tibble() to pass your column names that will be remembered.
       ")
+    }
   }
 }
 
@@ -493,41 +505,37 @@ get_elements = function(.data, .element, of_samples = TRUE){
 #' @param .abundance A character name of the abundance column
 #'
 #' @return A list of column enquo or error
-get_abundance_norm_if_exists = function(.data, .abundance){
-  
+get_abundance_norm_if_exists <- function(.data, .abundance) {
   # Comply with CRAN NOTES
-  .abundance_norm = NULL
-  
+  .abundance_norm <- NULL
+
   # If setted by the user, enquo those
-  if(
+  if (
     .abundance %>% quo_is_symbol()
-  )
+  ) {
     return(list(
       .abundance = .abundance
     ))
-  
-  # Otherwise check if attribute exists
+  } # Otherwise check if attribute exists
   else {
-    
     # If so, take them from the attribute
-    if(.data %>% attr("parameters") %>% is.null %>% not)
-      
+    if (.data %>% attr("parameters") %>% is.null() %>% not()) {
       return(list(
-        .abundance =  switch(
-          (".abundance_norm" %in% (.data %>% attr("parameters") %>% names) &
-             quo_name(.data %>% attr("parameters") %$% .abundance_norm) %in% (.data %>% colnames)
-          ) %>% not %>% sum(1),
-          attr(.data, "parameters")$.abundance_norm,
-          attr(.data, "parameters")$.abundance
+        .abundance = switch((".abundance_norm" %in% (.data %>% attr("parameters") %>% names()) &
+          quo_name(.data %>% attr("parameters") %$% .abundance_norm) %in% (.data %>% colnames())
+        ) %>% not() %>% sum(1),
+        attr(.data, "parameters")$.abundance_norm,
+        attr(.data, "parameters")$.abundance
         )
       ))
-    # Else through error
-    else
+    } # Else through error
+    else {
       stop("
         tidyHeatmap says: The function does not know what your elements (e.g., sample) are.\n
         You have to either enter those as symbols (e.g., `sample`), \n
         or use the funtion create_tt_from_tibble() to pass your column names that will be remembered.
       ")
+    }
   }
 }
 
@@ -540,13 +548,12 @@ get_abundance_norm_if_exists = function(.data, .abundance){
 #'
 #'
 #' @return A tibble with pairs to drop
-select_closest_pairs = function(df) {
-  
+select_closest_pairs <- function(df) {
   # Comply with CRAN NOTES
-  `sample 1` = `sample 2` =  NULL
-  
+  `sample 1` <- `sample 2` <- NULL
+
   couples <- df %>% head(n = 0)
-  
+
   while (df %>% nrow() > 0) {
     pair <- df %>%
       arrange(dist) %>%
@@ -558,422 +565,101 @@ select_closest_pairs = function(df) {
           !`sample 2` %in% (pair %>% select(1:2) %>% as.character())
       )
   }
-  
+
   couples
-  
 }
 
 #' get_x_y_annotation_columns
-#' 
+#'
 #' @importFrom magrittr equals
 #' @importFrom purrr pmap
-#' 
+#'
 #' @param .data A `tbl` formatted as | <SAMPLE> | <TRANSCRIPT> | <COUNT> | <...> |
 #' @param .column The name of the column horizontally presented in the heatmap
 #' @param .row The name of the column vertically presented in the heatmap
 #' @param .abundance The name of the transcript/gene abundance column
-#' 
+#'
 #' @return A list
-#' 
-get_x_y_annotation_columns = function(.data, .column, .row, .abundance){
-  
+#'
+get_x_y_annotation_columns <- function(.data, .column, .row, .abundance) {
   # Comply with CRAN NOTES
-  . = NULL
-  value = NULL
-  orientation = NULL
-  col_name = NULL
-  
+  . <- NULL
+  value <- NULL
+  orientation <- NULL
+  col_name <- NULL
+
   # Make col names
-  .column = enquo(.column)
-  .row = enquo(.row)
-  .abundance = enquo(.abundance)
-  
+  .column <- enquo(.column)
+  .row <- enquo(.row)
+  .abundance <- enquo(.abundance)
+
   .data %>%
     select_if(negate(is.list)) %>%
     ungroup() %>%
     {
       # Rows
       bind_rows(
-        (.) %>% subset(!!.column) %>% colnames %>% as_tibble %>% rename(column = value) %>% gather(orientation, col_name),
-        (.) %>% subset(!!.row) %>% colnames %>% as_tibble %>% rename(row = value) %>% gather(orientation, col_name)
+        (.) %>% subset(!!.column) %>% colnames() %>% as_tibble() %>% rename(column = value) %>% gather(orientation, col_name),
+        (.) %>% subset(!!.row) %>% colnames() %>% as_tibble() %>% rename(row = value) %>% gather(orientation, col_name)
       )
     }
 }
 
 #' @importFrom purrr map_chr
-ct_colors = function(ct) 
+ct_colors <- function(ct) {
   ct %>%
-  as.character() %>%
-  map_chr(
-    ~ switch(
-      .x,
-      "E" = "#199E78",
-      "F" = "#D96013",
-      "M" = "#7571B3",
-      "T" = "#E52E89"
+    as.character() %>%
+    map_chr(
+      ~ switch(.x,
+        "E" = "#199E78",
+        "F" = "#D96013",
+        "M" = "#7571B3",
+        "T" = "#E52E89"
+      )
     )
-  )
+}
 
 #' @importFrom ComplexHeatmap anno_points
 #' @importFrom ComplexHeatmap anno_barplot
 #' @importFrom ComplexHeatmap anno_lines
-type_to_annot_function = list(
-  "tile" = NULL, #anno_simple, 
-  "point" = anno_points, 
-  "bar" = anno_barplot, 
+type_to_annot_function <- list(
+  "tile" = NULL, # anno_simple,
+  "point" = anno_points,
+  "bar" = anno_barplot,
   "line" = anno_lines
 )
 
-get_top_left_annotation = function(.data_, .column, .row, .abundance, annotation, palette_annotation, type, x_y_annot_cols, size, ...){
-  
-  # Comply with CRAN NOTES 
-  data = NULL
-  fx = NULL
-  annot = NULL
-  annot_type = NULL
-  idx = NULL
-  value = NULL
-  orientation = NULL
-  col_name = NULL
-  col_orientation = NULL
-  my_function = NULL
-  
-  .column = enquo(.column) 
-  .row = enquo(.row) 
-  .abundance = enquo(.abundance)
-  annotation = enquo(annotation)
-  
-  dots_args = rlang::dots_list(...)
-  
-  annotation_function = type_to_annot_function[type]
-  
+get_top_left_annotation <- function(.data_, .column, .row, .abundance, annotation, palette_annotation, type, x_y_annot_cols, size, ...) {
+  # Comply with CRAN NOTES
+  data <- NULL
+  fx <- NULL
+  annot <- NULL
+  annot_type <- NULL
+  idx <- NULL
+  value <- NULL
+  orientation <- NULL
+  col_name <- NULL
+  col_orientation <- NULL
+  my_function <- NULL
+
+  .column <- enquo(.column)
+  .row <- enquo(.row)
+  .abundance <- enquo(.abundance)
+  annotation <- enquo(annotation)
+
+  dots_args <- rlang::dots_list(...)
+
+  annotation_function <- type_to_annot_function[type]
+
   # Create dataset
   quo_names(annotation) %>%
-	  as_tibble %>%
-	  rename(col_name = value) %>%
-	  
-	  # delete if annotation is NULL
-	  when(quo_is_null(annotation) ~ slice(., 0), ~ (.)) %>%
-	  
-	  # Add orientation
-	  left_join(x_y_annot_cols,  by = "col_name") %>%
-	  mutate(col_orientation = map_chr(orientation, ~ .x %>% when((.) == "column" ~ quo_name(.column), (.) == "row" ~ quo_name(.row)))) %>%
-	  
-	  # Add data
-	  mutate(
-	    data = map2(
-	      col_name,
-	      col_orientation,
-	      ~
-	        .data_ %>%
-	        ungroup() %>%
-	        select(.y, .x) %>%
-	        distinct() %>% 
-	        arrange_at(vars(.y)) %>%
-	        pull(.x)
-	    )
-	  )  %>%
-	    
-	  # Add function
-	  mutate(my_function = annotation_function) %>%
-	  mutate(type = !!type) |> 
-	
-	  	
-	  # Apply annot function if not NULL otherwise pass original annotation
-	  # This because no function for ComplexHeatmap = to tile
-	  mutate(annot = pmap(list(data, type, orientation), ~  {
-	    
-	  	if(..3 == "column"){
-	  		if(..2 == "tile") return(..1)
-	  		else if(..2 == "point") return(anno_points(..1, which=..3, height = size) )
-	  		else if(..2 == "bar") return(anno_barplot(..1, which=..3, height = size) )
-	  		else if(..2 == "line") return(anno_lines(..1, which=..3, height = size) )
-	  	} 
-	  	else if(..3 == "row"){
-	  		if(..2 == "tile") return(..1)
-	  		else if(..2 == "point") return(anno_points(..1, which=..3, width = size) )
-	  		else if(..2 == "bar") return(anno_barplot(..1, which=..3, width = size) )
-	  		else if(..2 == "line") return(anno_lines(..1, which=..3, width = size) )
-	  	} 
-
-	    
-  })) %>%
-	  
-	  # # Check if NA in annotations
-	  # mutate_at(vars(!!annotation), function(x) {
-	  # 	if(any(is.na(x))) { warning("tidyHeatmap says: You have NAs into your annotation column"); replace_na(x, "NA"); } 
-	  # 	else { x } 
-	  # } ) %>% 
-	  
-		# Add color indexes separately for each orientation
-		mutate(annot_type = map_chr(annot, ~ .x %>% when(class(.) %in% c("factor", "character", "logical") ~ "discrete",
-																										class(.) %in% c("integer", "numerical", "numeric", "double") ~ "continuous",
-																										~ "other"
-		) )) %>%
-		group_by(annot_type) %>%
-		mutate(idx =  row_number()) %>%
-		ungroup() %>%
-  	
-		mutate(color = map2(annot, idx,  ~ {
-			if(.x %>% class %in% c("factor", "character", "logical")){
-				
-				# If is colorRamp 
-				if(is(palette_annotation$discrete[[.y]], "function"))
-					palette_annotation$discrete[[.y]]
-				
-				# If it is a list of colors
-				else
-				    if (is(.x, "factor")) {
-				      color_vector <- palette_annotation$discrete[[.y]] %>% setNames(levels(.x))
-				      color_vector[!is.na(names(color_vector))]
-				      
-				    } else {
-				      colorRampPalette(palette_annotation$discrete[[.y]])(length(unique(.x))) %>% setNames(unique(.x))
-				    }			
-			  
-			} else if (.x %>% class %in% c("integer", "numerical", "numeric", "double")){
-				
-				# If is colorRamp 
-				if(is(palette_annotation$continuous[[.y]], "function"))
-					palette_annotation$continuous[[.y]]
-
-				# If it is a list of colors
-				else
-					colorRampPalette(palette_annotation$continuous[[.y]])(length(.x)) %>% colorRamp2(seq(min(.x), max(.x), length.out = length(.x)), .)
-				
-			}
-			else NULL
-		})) %>%
-	  	
-	  mutate(further_arguments = map2(
-	  	col_name, my_function,
-	  	~ dots_args %>% 
-	  		
-	  		# If tile add size as further argument
-	  		when(!is_function(.y) ~ c(., list(simple_anno_size = size)), ~ (.))
-	  		
-	  )) %>% 	
-	  
-	  # Stop if annotations discrete bigger than palette
-	  when(
-	    (.) %>%  pull(data) %>% map_chr(~ .x %>% class) %in% 
-	      c("factor", "character") %>% which %>% length %>%
-	      gt(palette_annotation$discrete %>% length) ~
-	      stop("tidyHeatmap says: Your discrete annotaton columns are bigger than the palette available"),
-	    ~ (.)
-	  ) %>%
-	  
-	  # Stop if annotations continuous bigger than palette
-	  when(
-	    (.) %>%  pull(data) %>% map_chr(~ .x %>% class) %in% 
-	      c("int", "dbl", "numeric") %>% which %>% length %>%
-	      gt( palette_annotation$continuous %>% length) ~
-	      stop("tidyHeatmap says: Your continuous annotaton columns are bigger than the palette available"),
-	    ~ (.)
-	  )
-      
-  
-}
-
-#' @importFrom grid unit
-#' @importFrom ComplexHeatmap anno_block
-get_group_annotation = function(.data, .column, .row, .abundance, palette_annotation){
-  
-  # Comply with CRAN NOTES
-  data = NULL
-  . = NULL
-  orientation = NULL
-  
-  # Make col names
-  .column = enquo(.column)
-  .row = enquo(.row)
-  .abundance = enquo(.abundance)
-
-  # Setup default NULL
-  top_annotation = list()
-  left_annotation = list()
-  row_split = NULL
-  col_split = NULL
-  
-  # Column groups
-  col_group = get_grouping_columns(.data)
-  
-  # Data frame of column orientation
-  x_y_annot_cols = .data %>% get_x_y_annotation_columns(!!.column,!!.row,!!.abundance) 
-  
-  
-  x_y_annotation_cols = 
-    x_y_annot_cols %>%
-    nest(data = -orientation) %>%
-    mutate(data = map(data, ~ .x %>% pull(1))) %>%
-    {
-      df = (.)
-      pull(df, data) %>% setNames(pull(df, orientation))
-    } %>%
-    map(
-      ~ .x %>% intersect(col_group)
-    )
-   
-  # Check if you have more than one grouping, at the moment just one is accepted
-  if(x_y_annotation_cols %>% lapply(length) %>% unlist %>% max %>% gt(1))
-    stop("tidyHeatmap says: At the moment just one grouping per dimension (max 1 row and 1 column) is supported.")
-  
-  # Check if annotation not specific to row or columns
-  if(x_y_annotation_cols %>% unlist() %>% duplicated() %>% any())
-  	stop(sprintf("tidyHeatmap says: the grouping %s is not specific to row or columns. Maybe you just have one grouping.", x_y_annotation_cols %>% unlist() %>% .[x_y_annotation_cols %>% unlist() %>% duplicated()]))
-  
-  if(length(x_y_annotation_cols$row) > 0){
-       
-    # Row split
-    row_split = 
-      .data %>%
-      ungroup() %>%
-      distinct(!!.row, !!as.symbol(x_y_annotation_cols$row)) %>%
-      arrange(!!.row) %>%
-      pull(!!as.symbol(x_y_annotation_cols$row))
-    
-    # Create array of colours
-    palette_fill_row = 
-      colorRampPalette(
-      palette_annotation[[1]][
-        
-        # If too long get the max length of palette
-        1:min(length(unique(row_split)), length(palette_annotation[[1]]))
-      ])(
-        # Extend colours arbitrarily
-        length(unique(row_split))
-      ) %>%
-      setNames(unique(row_split))
-    
-    # Old simple method
-    #palette_annotation[[1]][1:length(unique(row_split))] %>% setNames(unique(row_split))
-    
-    palette_text_row =  if_else(palette_fill_row %in% c("#FFFFFF", "white"), "#161616", "#ffffff")
-  
-    left_annotation_args = 
-      list(
-        ct = anno_block(  
-          gp = gpar(fill = palette_fill_row ),
-          labels = row_split %>% unique %>% sort,
-          labels_gp = gpar(col = palette_text_row, fontsize = 8),
-          which = "row",
-          width = unit(9, "pt")
-        )
-      )
-    
-    left_annotation = as.list(left_annotation_args)
-    
-    # Eliminate palette
-    palette_annotation = palette_annotation[-1]
-    
-    }
-    
-    if(length(x_y_annotation_cols$column) > 0){
-      # Col split
-      col_split = 
-        .data %>%
-        ungroup() %>%
-        distinct(!!.column, !!as.symbol(x_y_annotation_cols$column)) %>%
-        arrange(!!.column) %>%
-        pull(!!as.symbol(x_y_annotation_cols$column))
-      
-      # Create array of colours
-      palette_fill_column = 
-        colorRampPalette(
-          palette_annotation[[1]][
-            
-            # If too long get the max length of palette
-            1:min(length(unique(col_split)), length(palette_annotation[[1]]))
-          ])(
-            # Extend colours arbitrarily
-            length(unique(col_split))
-          ) %>%
-        setNames(unique(col_split))
-      
-      # Old simple method
-      #palette_annotation[[1]][1:length(unique(col_split))] %>% setNames(unique(col_split))
-  
-      palette_text_column =  if_else(palette_fill_column %in% c("#FFFFFF", "white"), "#161616", "#ffffff")
-      
-      
-      top_annotation_args = 
-        list(
-          ct = anno_block(  
-            gp = gpar(fill = palette_fill_column ),
-            labels = col_split %>% unique %>% sort,
-            labels_gp = gpar(col = palette_text_column, fontsize = 8),
-            which = "column",
-            height = unit(9, "pt")
-          )
-        )
-      
-       top_annotation = as.list(top_annotation_args)
-    }
-  
-  
-  # Return
-  list( left_annotation = left_annotation, row_split = row_split, top_annotation = top_annotation, col_split = col_split )
-}
-
-get_group_annotation_OPTIMISED_NOT_FINISHED = function(.data, .column, .row, .abundance, palette_annotation){
-  
-  # Fix CRAN notes
-  value = NULL
-  col_name = NULL
-  col_orientation = NULL
-  annotation_function = NULL
-  
-  # Comply with CRAN NOTES
-  data = NULL
-  . = NULL
-  orientation = NULL
-  
-  # Make col names
-  .column = enquo(.column)
-  .row = enquo(.row)
-  .abundance = enquo(.abundance)
-  
-  # Setup default NULL
-  top_annotation = NULL
-  left_annotation = NULL
-  row_split = NULL
-  col_split = NULL
-  
-  # Column groups
-  col_group = get_grouping_columns(.data)
-  
-  # Dataframe of column orientation
-  x_y_annot_cols = .data %>% get_x_y_annotation_columns(!!.column,!!.row,!!.abundance) 
-  
-  
-  x_y_annotation_cols = 
-    x_y_annot_cols %>%
-    nest(data = -orientation) %>%
-    mutate(data = map(data, ~ .x %>% pull(1))) %>%
-    {
-      df = (.)
-      pull(df, data) %>% setNames(pull(df, orientation))
-    } %>%
-    map(
-      ~ .x %>% intersect(col_group)
-    )
-  
-  # Check if you have more than one grouping, at the moment just one is accepted
-  if(x_y_annotation_cols %>% lapply(length) %>% unlist %>% max %>% gt(1))
-    stop("tidyHeatmap says: At the moment just one grouping per dimension (max 1 row and 1 column) is supported.")
-  
-  # Create dataset
-  col_group %>%
-    as_tibble %>%
+    as_tibble() %>%
     rename(col_name = value) %>%
-    
     # delete if annotation is NULL
-    when(length(col_group)==0 ~ slice(., 0), ~ (.)) %>%
-    
+    when(quo_is_null(annotation) ~ slice(., 0), ~ (.)) %>%
     # Add orientation
-    left_join(x_y_annot_cols,  by = "col_name") %>%
+    left_join(x_y_annot_cols, by = "col_name") %>%
     mutate(col_orientation = map_chr(orientation, ~ .x %>% when((.) == "column" ~ quo_name(.column), (.) == "row" ~ quo_name(.row)))) %>%
-    
     # Add data
     mutate(
       data = map2(
@@ -981,108 +667,412 @@ get_group_annotation_OPTIMISED_NOT_FINISHED = function(.data, .column, .row, .ab
         col_orientation,
         ~
           .data_ %>%
-          ungroup() %>%
-          select(.y, .x) %>%
-          distinct() %>%
-          arrange_at(vars(.y)) %>%
-          pull(.x)
+            ungroup() %>%
+            select(.y, .x) %>%
+            distinct() %>%
+            arrange_at(vars(.y)) %>%
+            pull(.x)
       )
-    )  %>%
-    
+    ) %>%
     # Add function
-    mutate(fx = annotation_function) 
-  
-  if(length(x_y_annotation_cols$row) > 0){
-    
+    mutate(my_function = annotation_function) %>%
+    mutate(type = !!type) |>
+    # Apply annot function if not NULL otherwise pass original annotation
+    # This because no function for ComplexHeatmap = to tile
+    mutate(annot = pmap(list(data, type, orientation), ~ {
+      if (..3 == "column") {
+        if (..2 == "tile") {
+          return(..1)
+        } else if (..2 == "point") {
+          return(anno_points(..1, which = ..3, height = size))
+        } else if (..2 == "bar") {
+          return(anno_barplot(..1, which = ..3, height = size))
+        } else if (..2 == "line") {
+          return(anno_lines(..1, which = ..3, height = size))
+        }
+      } else if (..3 == "row") {
+        if (..2 == "tile") {
+          return(..1)
+        } else if (..2 == "point") {
+          return(anno_points(..1, which = ..3, width = size))
+        } else if (..2 == "bar") {
+          return(anno_barplot(..1, which = ..3, width = size))
+        } else if (..2 == "line") {
+          return(anno_lines(..1, which = ..3, width = size))
+        }
+      }
+    })) %>%
+    # # Check if NA in annotations
+    # mutate_at(vars(!!annotation), function(x) {
+    # 	if(any(is.na(x))) { warning("tidyHeatmap says: You have NAs into your annotation column"); replace_na(x, "NA"); }
+    # 	else { x }
+    # } ) %>%
+
+    # Add color indexes separately for each orientation
+    mutate(annot_type = map_chr(annot, ~ .x %>% when(
+      class(.) %in% c("factor", "character", "logical") ~ "discrete",
+      class(.) %in% c("integer", "numerical", "numeric", "double") ~ "continuous",
+      ~"other"
+    ))) %>%
+    group_by(annot_type) %>%
+    mutate(idx = row_number()) %>%
+    ungroup() %>%
+    mutate(color = map2(annot, idx, ~ {
+      if (.x %>% class() %in% c("factor", "character", "logical")) {
+        # If is colorRamp
+        if (is(palette_annotation$discrete[[.y]], "function")) {
+          palette_annotation$discrete[[.y]]
+        } # If it is a list of colors
+        else if (is(.x, "factor")) {
+          color_vector <- palette_annotation$discrete[[.y]] %>% setNames(levels(.x))
+          color_vector[!is.na(names(color_vector))]
+        } else {
+          colorRampPalette(palette_annotation$discrete[[.y]])(length(unique(.x))) %>% setNames(unique(.x))
+        }
+      } else if (.x %>% class() %in% c("integer", "numerical", "numeric", "double")) {
+        # If is colorRamp
+        if (is(palette_annotation$continuous[[.y]], "function")) {
+          palette_annotation$continuous[[.y]]
+        } # If it is a list of colors
+        else {
+          colorRampPalette(palette_annotation$continuous[[.y]])(length(.x)) %>% colorRamp2(seq(min(.x), max(.x), length.out = length(.x)), .)
+        }
+      } else {
+        NULL
+      }
+    })) %>%
+    mutate(further_arguments = map2(
+      col_name, my_function,
+      ~ dots_args %>%
+        # If tile add size as further argument
+        when(!is_function(.y) ~ c(., list(simple_anno_size = size)), ~ (.))
+    )) %>%
+    # Stop if annotations discrete bigger than palette
+    when(
+      (.) %>% pull(data) %>% map_chr(~ .x %>% class()) %in%
+        c("factor", "character") %>% which() %>% length() %>%
+        gt(palette_annotation$discrete %>% length()) ~
+        stop("tidyHeatmap says: Your discrete annotaton columns are bigger than the palette available"),
+      ~ (.)
+    ) %>%
+    # Stop if annotations continuous bigger than palette
+    when(
+      (.) %>% pull(data) %>% map_chr(~ .x %>% class()) %in%
+        c("int", "dbl", "numeric") %>% which() %>% length() %>%
+        gt(palette_annotation$continuous %>% length()) ~
+        stop("tidyHeatmap says: Your continuous annotaton columns are bigger than the palette available"),
+      ~ (.)
+    )
+}
+
+#' @importFrom grid unit
+#' @importFrom ComplexHeatmap anno_block
+get_group_annotation <- function(.data, .column, .row, .abundance, palette_annotation) {
+  # Comply with CRAN NOTES
+  data <- NULL
+  . <- NULL
+  orientation <- NULL
+
+  # Make col names
+  .column <- enquo(.column)
+  .row <- enquo(.row)
+  .abundance <- enquo(.abundance)
+
+  # Setup default NULL
+  top_annotation <- list()
+  left_annotation <- list()
+  row_split <- NULL
+  col_split <- NULL
+
+  # Column groups
+  col_group <- get_grouping_columns(.data)
+
+  # Data frame of column orientation
+  x_y_annot_cols <- .data %>% get_x_y_annotation_columns(!!.column, !!.row, !!.abundance)
+
+
+  x_y_annotation_cols <-
+    x_y_annot_cols %>%
+    nest(data = -orientation) %>%
+    mutate(data = map(data, ~ .x %>% pull(1))) %>%
+    {
+      df <- (.)
+      pull(df, data) %>% setNames(pull(df, orientation))
+    } %>%
+    map(
+      ~ .x %>% intersect(col_group)
+    )
+
+  # Check if you have more than one grouping, at the moment just one is accepted
+  if (x_y_annotation_cols %>% lapply(length) %>% unlist() %>% max() %>% gt(1)) {
+    stop("tidyHeatmap says: At the moment just one grouping per dimension (max 1 row and 1 column) is supported.")
+  }
+
+  # Check if annotation not specific to row or columns
+  if (x_y_annotation_cols %>% unlist() %>% duplicated() %>% any()) {
+    stop(sprintf("tidyHeatmap says: the grouping %s is not specific to row or columns. Maybe you just have one grouping.", x_y_annotation_cols %>% unlist() %>% .[x_y_annotation_cols %>%
+      unlist() %>%
+      duplicated()]))
+  }
+
+  if (length(x_y_annotation_cols$row) > 0) {
     # Row split
-    row_split = 
+    row_split <-
       .data %>%
       ungroup() %>%
       distinct(!!.row, !!as.symbol(x_y_annotation_cols$row)) %>%
       arrange(!!.row) %>%
       pull(!!as.symbol(x_y_annotation_cols$row))
-    
-    # Create array of colors
-    palette_fill_row = palette_annotation[[1]][1:length(unique(row_split))] %>% setNames(unique(row_split))
-    
-    left_annotation_args = 
+
+    # Create array of colours
+    palette_fill_row <-
+      colorRampPalette(
+        palette_annotation[[1]][
+
+          # If too long get the max length of palette
+          1:min(length(unique(row_split)), length(palette_annotation[[1]]))
+        ]
+      )(
+        # Extend colours arbitrarily
+        length(unique(row_split))
+      ) %>%
+      setNames(unique(row_split))
+
+    # Old simple method
+    # palette_annotation[[1]][1:length(unique(row_split))] %>% setNames(unique(row_split))
+
+    palette_text_row <- if_else(palette_fill_row %in% c("#FFFFFF", "white"), "#161616", "#ffffff")
+
+    left_annotation_args <-
       list(
-        ct = anno_block(  
-          gp = gpar(fill = palette_fill_row ),
-          labels = row_split %>% unique %>% sort,
-          labels_gp = gpar(col = "white"),
-          which = "row"
+        ct = anno_block(
+          gp = gpar(fill = palette_fill_row),
+          labels = row_split %>% unique() %>% sort(),
+          labels_gp = gpar(col = palette_text_row, fontsize = 8),
+          which = "row",
+          width = unit(9, "pt")
         )
       )
-    
-    left_annotation = as.list(left_annotation_args)
-    
+
+    left_annotation <- as.list(left_annotation_args)
+
     # Eliminate palette
-    palette_annotation = palette_annotation[-1]
-    
+    palette_annotation <- palette_annotation[-1]
   }
-  
-  if(length(x_y_annotation_cols$column) > 0){
+
+  if (length(x_y_annotation_cols$column) > 0) {
     # Col split
-    col_split = 
+    col_split <-
       .data %>%
       ungroup() %>%
       distinct(!!.column, !!as.symbol(x_y_annotation_cols$column)) %>%
       arrange(!!.column) %>%
       pull(!!as.symbol(x_y_annotation_cols$column))
-    
-    # Create array of colors
-    palette_fill_column = palette_annotation[[1]][1:length(unique(col_split))] %>% setNames(unique(col_split))
-    
-    top_annotation_args = 
+
+    # Create array of colours
+    palette_fill_column <-
+      colorRampPalette(
+        palette_annotation[[1]][
+
+          # If too long get the max length of palette
+          1:min(length(unique(col_split)), length(palette_annotation[[1]]))
+        ]
+      )(
+        # Extend colours arbitrarily
+        length(unique(col_split))
+      ) %>%
+      setNames(unique(col_split))
+
+    # Old simple method
+    # palette_annotation[[1]][1:length(unique(col_split))] %>% setNames(unique(col_split))
+
+    palette_text_column <- if_else(palette_fill_column %in% c("#FFFFFF", "white"), "#161616", "#ffffff")
+
+
+    top_annotation_args <-
       list(
-        ct = anno_block(  
-          gp = gpar(fill = palette_fill_column ),
-          labels = col_split %>% unique %>% sort,
+        ct = anno_block(
+          gp = gpar(fill = palette_fill_column),
+          labels = col_split %>% unique() %>% sort(),
+          labels_gp = gpar(col = palette_text_column, fontsize = 8),
+          which = "column",
+          height = unit(9, "pt")
+        )
+      )
+
+    top_annotation <- as.list(top_annotation_args)
+  }
+
+
+  # Return
+  list(left_annotation = left_annotation, row_split = row_split, top_annotation = top_annotation, col_split = col_split)
+}
+
+get_group_annotation_OPTIMISED_NOT_FINISHED <- function(.data, .column, .row, .abundance, palette_annotation) {
+  # Fix CRAN notes
+  value <- NULL
+  col_name <- NULL
+  col_orientation <- NULL
+  annotation_function <- NULL
+
+  # Comply with CRAN NOTES
+  data <- NULL
+  . <- NULL
+  orientation <- NULL
+
+  # Make col names
+  .column <- enquo(.column)
+  .row <- enquo(.row)
+  .abundance <- enquo(.abundance)
+
+  # Setup default NULL
+  top_annotation <- NULL
+  left_annotation <- NULL
+  row_split <- NULL
+  col_split <- NULL
+
+  # Column groups
+  col_group <- get_grouping_columns(.data)
+
+  # Dataframe of column orientation
+  x_y_annot_cols <- .data %>% get_x_y_annotation_columns(!!.column, !!.row, !!.abundance)
+
+
+  x_y_annotation_cols <-
+    x_y_annot_cols %>%
+    nest(data = -orientation) %>%
+    mutate(data = map(data, ~ .x %>% pull(1))) %>%
+    {
+      df <- (.)
+      pull(df, data) %>% setNames(pull(df, orientation))
+    } %>%
+    map(
+      ~ .x %>% intersect(col_group)
+    )
+
+  # Check if you have more than one grouping, at the moment just one is accepted
+  if (x_y_annotation_cols %>% lapply(length) %>% unlist() %>% max() %>% gt(1)) {
+    stop("tidyHeatmap says: At the moment just one grouping per dimension (max 1 row and 1 column) is supported.")
+  }
+
+  # Create dataset
+  col_group %>%
+    as_tibble() %>%
+    rename(col_name = value) %>%
+    # delete if annotation is NULL
+    when(length(col_group) == 0 ~ slice(., 0), ~ (.)) %>%
+    # Add orientation
+    left_join(x_y_annot_cols, by = "col_name") %>%
+    mutate(col_orientation = map_chr(orientation, ~ .x %>% when((.) == "column" ~ quo_name(.column), (.) == "row" ~ quo_name(.row)))) %>%
+    # Add data
+    mutate(
+      data = map2(
+        col_name,
+        col_orientation,
+        ~
+          .data_ %>%
+            ungroup() %>%
+            select(.y, .x) %>%
+            distinct() %>%
+            arrange_at(vars(.y)) %>%
+            pull(.x)
+      )
+    ) %>%
+    # Add function
+    mutate(fx = annotation_function)
+
+  if (length(x_y_annotation_cols$row) > 0) {
+    # Row split
+    row_split <-
+      .data %>%
+      ungroup() %>%
+      distinct(!!.row, !!as.symbol(x_y_annotation_cols$row)) %>%
+      arrange(!!.row) %>%
+      pull(!!as.symbol(x_y_annotation_cols$row))
+
+    # Create array of colors
+    palette_fill_row <- palette_annotation[[1]][1:length(unique(row_split))] %>% setNames(unique(row_split))
+
+    left_annotation_args <-
+      list(
+        ct = anno_block(
+          gp = gpar(fill = palette_fill_row),
+          labels = row_split %>% unique() %>% sort(),
+          labels_gp = gpar(col = "white"),
+          which = "row"
+        )
+      )
+
+    left_annotation <- as.list(left_annotation_args)
+
+    # Eliminate palette
+    palette_annotation <- palette_annotation[-1]
+  }
+
+  if (length(x_y_annotation_cols$column) > 0) {
+    # Col split
+    col_split <-
+      .data %>%
+      ungroup() %>%
+      distinct(!!.column, !!as.symbol(x_y_annotation_cols$column)) %>%
+      arrange(!!.column) %>%
+      pull(!!as.symbol(x_y_annotation_cols$column))
+
+    # Create array of colors
+    palette_fill_column <- palette_annotation[[1]][1:length(unique(col_split))] %>% setNames(unique(col_split))
+
+    top_annotation_args <-
+      list(
+        ct = anno_block(
+          gp = gpar(fill = palette_fill_column),
+          labels = col_split %>% unique() %>% sort(),
           labels_gp = gpar(col = "white"),
           which = "column"
         )
       )
-    
-    top_annotation = as.list(top_annotation_args)
+
+    top_annotation <- as.list(top_annotation_args)
   }
-  
-  
+
+
   # Return
-  list( left_annotation = left_annotation, row_split = row_split, top_annotation = top_annotation, col_split = col_split )
+  list(left_annotation = left_annotation, row_split = row_split, top_annotation = top_annotation, col_split = col_split)
 }
 
-get_grouping_columns = function(.data){
-  
+get_grouping_columns <- function(.data) {
   # Comply with CRAN NOTES
-  .rows = NULL
-  
-  if("groups" %in%  (.data %>% attributes %>% names))
-    .data %>% attr("groups") %>% select(-.rows) %>% colnames()
-  else c()
+  .rows <- NULL
+
+  if ("groups" %in% (.data %>% attributes() %>% names())) {
+    .data %>%
+      attr("groups") %>%
+      select(-.rows) %>%
+      colnames()
+  } else {
+    c()
+  }
 }
 
-list_drop_null = function(.data){
-  .data[!sapply(.data, is.null)] 
+list_drop_null <- function(.data) {
+  .data[!sapply(.data, is.null)]
 }
 
-#' Scale counts in a robust way against sd == 0 
-#' 
+#' Scale counts in a robust way against sd == 0
+#'
 #' @param y A numerical array
-#' 
+#'
 #' @return A scaled and centred numerical array
-#' 
+#'
 #' @export
-#' @references Mangiola, S. and Papenfuss, A.T., 2020. "tidyHeatmap: an R package for 
+#' @references Mangiola, S. and Papenfuss, A.T., 2020. "tidyHeatmap: an R package for
 #'   modular heatmap production based on tidy principles." Journal of Open Source Software.
 #'   doi:10.21105/joss.02472.
 #' @source [Mangiola and Papenfuss., 2020](https://joss.theoj.org/papers/10.21105/joss.02472)
-scale_robust = function(y){
-  
-  do_consider_df = !is.na(sd(y, na.rm=T)) && as.logical(sd(y, na.rm=T) )
-  
-  (y - mean(y, na.rm=T)) / ( sd(y, na.rm=T) ^ do_consider_df )
-} 
+scale_robust <- function(y) {
+  do_consider_df <- !is.na(sd(y, na.rm = T)) && as.logical(sd(y, na.rm = T))
+
+  (y - mean(y, na.rm = T)) / (sd(y, na.rm = T)^do_consider_df)
+}
 
 #' Convert array of quosure (e.g. c(col_a, col_b)) into character vector
 #'
@@ -1093,146 +1083,160 @@ scale_robust = function(y){
 #'
 #' @return A character vector
 quo_names <- function(v) {
-  
-  v = quo_name(quo_squash(v))
-  gsub('^c\\(|`|\\)$', '', v) %>% 
-    strsplit(', ') %>% 
-    unlist 
+  v <- quo_name(quo_squash(v))
+  gsub("^c\\(|`|\\)$", "", v) %>%
+    strsplit(", ") %>%
+    unlist()
 }
 
 #' annot_to_list
-#' 
+#'
 #' @importFrom purrr map_lgl
-#' 
+#'
 #' @param .data A data frame
-#' 
+#'
 #' @return A list
-annot_to_list = function(.data){
-  
+annot_to_list <- function(.data) {
   # Comply with CRAN NOTES
-  col_name = NULL
-  annot = NULL
-  value = NULL
-  my_cells = NULL
-  name = NULL
-  data = NULL
-  
-  
-  .data %>% 
-  	pull(annot) %>%
-  	setNames(.data %>% pull(col_name))  %>%
-    
+  col_name <- NULL
+  annot <- NULL
+  value <- NULL
+  my_cells <- NULL
+  name <- NULL
+  data <- NULL
+
+
+  .data %>%
+    pull(annot) %>%
+    setNames(.data %>% pull(col_name)) %>%
     # If list is populated
-    when(length(.) > 0 ~ (.) %>% c(
-      col = list(.data %>%
-                   filter(map_lgl(color, ~ .x %>% is.null %>% not)) %>%
-                   { setNames( pull(., color),  pull(., col_name))    })
-    ) %>%
-    	
-    	# Add additional arguments
-    	c(
-    		.data %>% 
-    			pull(further_arguments) %>% 
-    			combine_elements_with_the_same_name()
-    	),
-    
-    ~ (.)) 
-    
-}
-
-list_append = function(.list1, .list2){ .list1 %>% c(.list2) }
-
-reduce_to_tbl_if_in_class_chain = function(.obj){
-  .obj %>%
     when(
-      
-      # Eliminate all classes until tbl
-      "tbl" %in% class(.) ~ drop_class(., class(.)[1:which(class(.) == "tbl")-1]  ),
+      length(.) > 0 ~ (.) %>% c(
+        col = list(.data %>%
+          filter(map_lgl(color, ~ .x %>%
+            is.null() %>%
+            not())) %>%
+          {
+            setNames(pull(., color), pull(., col_name))
+          })
+      ) %>%
+        # Add additional arguments
+        c(
+          .data %>%
+            pull(further_arguments) %>%
+            combine_elements_with_the_same_name()
+        ),
       ~ (.)
     )
-  
+}
+
+list_append <- function(.list1, .list2) {
+  .list1 %>% c(.list2)
+}
+
+reduce_to_tbl_if_in_class_chain <- function(.obj) {
+  .obj %>%
+    when(
+
+      # Eliminate all classes until tbl
+      "tbl" %in% class(.) ~ drop_class(., class(.)[1:which(class(.) == "tbl") - 1]),
+      ~ (.)
+    )
 }
 
 # Greater than
-gt = function(a, b){	a > b }
+gt <- function(a, b) {
+  a > b
+}
 
 # Smaller than
-st = function(a, b){	a < b }
+st <- function(a, b) {
+  a < b
+}
 
 # Negation
-not = function(is){	!is }
+not <- function(is) {
+  !is
+}
 
 # Raise to the power
-pow = function(a,b){	a^b }
+pow <- function(a, b) {
+  a^b
+}
 
 #' @importFrom purrr map_dfr
 #' @importFrom purrr reduce
 #' @importFrom tibble enframe
 #' @importFrom grid unit.c
-combine_elements_with_the_same_name = function(x){
-	
-	# Fix CRAN notes
-	my_class  = NULL
-	value = NULL
-	name = NULL
-	data = NULL
-	
-	if(length(unlist(x))==0) return(unlist(x))
-	else {
-		list_df = 
-			map_dfr(x, ~ enframe(.x)) %>% 
-			mutate(my_class = map_chr(value, ~class(.x)[[1]])) 
-		
-		# The current backend does not allow multiple tails sizes
-		if(
-			list_df %>% 
-				filter(my_class == "simpleUnit") %>% 
-				nrow()  %>% 
-				gt(1) &&
-			list_df %>% 
-				filter(my_class == "simpleUnit") %>% 
-				pull(value) %>% 
-				reduce(identical) %>% 
-				not()
-		)
-			warning("tidyHeatmap says: the current backend only allows for one tail annotation size. The latter one will be selected.")
-			
-		# Select one size
-		list_df =  
-			bind_rows(
-			list_df %>% 
-				filter(my_class == "simpleUnit") %>% 
-				tail(1),
-			list_df %>% 
-				filter(my_class != "simpleUnit")
-		) %>% 
-			nest(data = -c(name, my_class)) %>% 
-			mutate(vector = map2(
-				data, my_class,
-				~ {
-					if(.y == "simpleUnit") reduce(.x$value, unit.c)
-					else if(.y == "gpar") combine_lists_with_the_same_name(.x$value) %>% as.list() %>% do.call(gpar, .)
-					else reduce(.x$value, c)
-				}
-			)) 
-		
-			
-		list_df %>% 
-			pull(vector) %>% 
-			setNames(list_df$name)
-			
-		# x = unlist(x)
-		# tapply(unlist(x, use.names = FALSE), rep(names(x), lengths(x)), FUN = c)
-	}
+combine_elements_with_the_same_name <- function(x) {
+  # Fix CRAN notes
+  my_class <- NULL
+  value <- NULL
+  name <- NULL
+  data <- NULL
 
+  if (length(unlist(x)) == 0) {
+    return(unlist(x))
+  } else {
+    list_df <-
+      map_dfr(x, ~ enframe(.x)) %>%
+      mutate(my_class = map_chr(value, ~ class(.x)[[1]]))
+
+    # The current backend does not allow multiple tails sizes
+    if (
+      list_df %>%
+        filter(my_class == "simpleUnit") %>%
+        nrow() %>%
+        gt(1) &&
+        list_df %>%
+          filter(my_class == "simpleUnit") %>%
+          pull(value) %>%
+          reduce(identical) %>%
+          not()
+    ) {
+      warning("tidyHeatmap says: the current backend only allows for one tail annotation size. The latter one will be selected.")
+    }
+
+    # Select one size
+    list_df <-
+      bind_rows(
+        list_df %>%
+          filter(my_class == "simpleUnit") %>%
+          tail(1),
+        list_df %>%
+          filter(my_class != "simpleUnit")
+      ) %>%
+      nest(data = -c(name, my_class)) %>%
+      mutate(vector = map2(
+        data, my_class,
+        ~ {
+          if (.y == "simpleUnit") {
+            reduce(.x$value, unit.c)
+          } else if (.y == "gpar") {
+            combine_lists_with_the_same_name(.x$value) %>%
+              as.list() %>%
+              do.call(gpar, .)
+          } else {
+            reduce(.x$value, c)
+          }
+        }
+      ))
+
+
+    list_df %>%
+      pull(vector) %>%
+      setNames(list_df$name)
+
+    # x = unlist(x)
+    # tapply(unlist(x, use.names = FALSE), rep(names(x), lengths(x)), FUN = c)
+  }
 }
 
-combine_lists_with_the_same_name = function(x){
-	
-	if(length(unlist(x))==0) return(unlist(x))
-	else {
-		x = unlist(x)
-		tapply(unlist(x, use.names = FALSE), rep(names(x), lengths(x)), FUN = c)
-	}
-	
+combine_lists_with_the_same_name <- function(x) {
+  if (length(unlist(x)) == 0) {
+    return(unlist(x))
+  } else {
+    x <- unlist(x)
+    tapply(unlist(x, use.names = FALSE), rep(names(x), lengths(x)), FUN = c)
+  }
 }
